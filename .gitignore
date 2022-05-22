@@ -1,0 +1,7 @@
+*.cred
+*.npy
+*.txt
+*.csv
+*.pyc
+*.zip
+confidential/
