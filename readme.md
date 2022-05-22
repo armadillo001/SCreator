@@ -16,6 +16,9 @@ For each indicator defined in config.ini:
 
 
 ### Key steps ###
+#### 0. Update your session cookie ####
+Please login the S Creator platform and copy your session cookie to confidential/session.ini, the session cookie can be found on your profile page (click the top right corner of your profile).
+
 #### 1. Setup config.ini ####
 
 config.ini: save all the meta data of data-streams, when you add a new data-stream, please set up the config.ini file
@@ -32,5 +35,4 @@ file should be STRICT the name of the indicator you defined in the config.ini fi
 We assume the creator of the data function will maintain the data stream in S-creator everyday so that others can use it. So a good idea
 would be to schedule the main.py task using something like "crontab" (in Linux and Mac) in your local system.  
 
-### correct model
-ETH_vol_Diff
+
