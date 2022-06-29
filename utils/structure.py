@@ -3,6 +3,7 @@ import requests
 import json
 import numpy as np
 import pandas as pd
+import time
 
 class stream:
 
@@ -24,6 +25,7 @@ class stream:
 
         self.flag_loader_ready = 1
         self.flag_init = 1
+        self.flag_ongoing = 1
 
     def load_config(self, config):
         """
@@ -55,6 +57,10 @@ class stream:
             arr_loaded = loader.fun_load_data(self.dateStart)
             self.logging.info('Computing...')
             self.arr_computed = loader.fun_compute_data(arr_loaded)
+            self.arr_computed.index.name = 'Date'
+            if not pd.api.types.is_numeric_dtype(self.arr_computed): # check whether it is a pd.series
+                self.logging.error('Loader format error, please check whether the output of data loader is a time series' % (path_loader))
+                self.flag_loader_ready = 0
             self.flag_loader_ready = 1
             self.logging.info('Loaded and computed the data stream: %s' % (self.name))
         except:
@@ -67,7 +73,7 @@ class stream:
         :return:
         """
         self.path_histfile = 'data/init_with/' + self.name + '.csv'
-        self.flag_init = not np.sum(self.pd_indicator_record.ModelName.str.contains(self.name).values)>=1
+        self.flag_init = not np.sum(self.pd_indicator_record.ModelName.str.fullmatch(self.name).values)>=1
         if self.flag_init==True:
             try:
                 self.arr_data_hist = self.arr_computed[:-1]
@@ -81,38 +87,42 @@ class stream:
         Upload the data stream onto the S-creator data platform
         :return:
         """
-        if self.flag_init==True:
-            date_create = str(self.arr_data_hist.index[-1]).split(' ')[0]
-            my_file = open(self.path_histfile, 'r')
-            history_file_str = my_file.read().strip()
-            url = "https://us-central1-modelcreator-cdd8f.cloudfunctions.net/functions/create_model_api"
-            querystring = {
-                "session_cookie": self.session_cookie,
-                "authors[]": self.authors.split(','),
-                "pctgs[]": self.pctgs.split(','),
-                "model_name": self.name,
-                "model_description": self.description,
-                "history_file": history_file_str,
-                "stocks": self.target,
-                "range": self.range  # put in (0 - 4) for (na, up to tmr, up to 1 week, up to 2 weeks, up to a month)
-            }
-            headers = {
-                'cache-control': "no-cache",
-                'Postman-Token': "3f5179b9-d4c2-4a08-9334-046efee45f25",
-                'Content-Type': "application/json"
-            }
-            response = requests.request("POST", url, headers=headers, data=json.dumps(querystring))
-            modelID = response.text
-            if response.status_code==200:
-                df_line = [[self.name, modelID, date_create, self.create_time , 1]]
-                df = pd.DataFrame(df_line, columns=['ModelName', 'ModelID', 'LastUpdateLocalTime', 'LastUpdateModelTime', 'CreateFlag'])
-                self.pd_indicator_record = self.pd_indicator_record.append(df, ignore_index=True)
-                self.pd_indicator_record.to_csv(self.path_indicator_state)
-                self.flag_init = False
-                self.logging.info('Create data stream Success! We uploaded %s to the server' % self.path_histfile)
-            else:
-                self.logging.error('Create data stream failed! We cannot upload %s to the server' % self.path_histfile)
-                self.logging.error('Reason: %s', response.text)
+        try:
+            if self.flag_init==True:
+                date_create = str(self.arr_data_hist.index[-1]).split(' ')[0]
+                my_file = open(self.path_histfile, 'r')
+                pd_temp = pd.read_csv(self.path_histfile) # Try to read it
+                history_file_str = my_file.read().strip()
+                url = "https://us-central1-modelcreator-cdd8f.cloudfunctions.net/functions/create_model_api"
+                querystring = {
+                    "session_cookie": self.session_cookie,
+                    "authors[]": self.authors.split(','),
+                    "pctgs[]": self.pctgs.split(','),
+                    "model_name": self.name,
+                    "model_description": self.description,
+                    "history_file": history_file_str,
+                    "stocks": self.target,
+                    "range": self.range  # put in (0 - 4) for (na, up to tmr, up to 1 week, up to 2 weeks, up to a month)
+                }
+                headers = {
+                    'cache-control': "no-cache",
+                    'Postman-Token': "3f5179b9-d4c2-4a08-9334-046efee45f25",
+                    'Content-Type': "application/json"
+                }
+                response = requests.request("POST", url, headers=headers, data=json.dumps(querystring))
+                modelID = response.text
+                if response.status_code==200:
+                    df_line = [[self.name, modelID, date_create, self.create_time , 1]]
+                    df = pd.DataFrame(df_line, columns=['ModelName', 'ModelID', 'LastUpdateLocalTime', 'LastUpdateModelTime', 'CreateFlag'])
+                    self.pd_indicator_record = self.pd_indicator_record.append(df, ignore_index=True)
+                    self.pd_indicator_record.to_csv(self.path_indicator_state)
+                    self.flag_init = False
+                    self.logging.info('Create data stream Success! We uploaded %s to the server' % self.path_histfile)
+                else:
+                    self.logging.error('Create data stream failed! We cannot upload %s to the server' % self.path_histfile)
+                    self.logging.error('Reason: %s', response.text)
+        except:
+            self.logging.error('Failed to create datastream %s' % (self.path_currentfile))
 
 
     def fun_save_ongoing(self):
@@ -122,11 +132,26 @@ class stream:
         """
 
         self.path_currentfile = 'data/on_going/' + self.name + '.csv'
+        self.pd_indicator_record_result = pd.read_csv(self.path_indicator_state, index_col=0)
+        time_model_last_updated = self.pd_indicator_record[self.pd_indicator_record['ModelName']==self.name].LastUpdateLocalTime.iloc[-1]
+        self.arr_computed.index = self.arr_computed.index.strftime("%Y-%m-%d")
+        if time_model_last_updated in self.arr_computed.index.to_list():
+            idx_date_last_in_data = self.arr_computed.index.to_list().index(time_model_last_updated)
+        else:
+            for idx0,date_now in enumerate(self.arr_computed.index.to_list()):
+                if date_now>=time_model_last_updated:
+                    idx_date_last_in_data = idx0 -1
         try:
-            self.arr_data_last = pd.DataFrame.from_dict({'Date': [str(self.arr_computed.index[-1]).split(' ')[0]], 'signal': [self.arr_computed.values[-1]]})
-            self.arr_data_last.to_csv(self.path_currentfile, index=False, header=False)
+            if idx_date_last_in_data<(len(self.arr_computed)-1):
+                self.arr_data_last = pd.DataFrame.from_dict({'Date': self.arr_computed.index[idx_date_last_in_data+1:].to_list(), 'signal': self.arr_computed.values[idx_date_last_in_data+1:].ravel().tolist()})
+                self.arr_data_last.to_csv(self.path_currentfile, index=False, header=False)
+                pd_temp = pd.read_csv(self.path_currentfile) # Try to read it
+            else:
+                self.logging.error('Indicator is up-to-date, does not update file %s' % (self.path_currentfile))
+                self.flag_ongoing = 0
         except:
             self.logging.error('Failed to save update file %s' % (self.path_currentfile))
+            self.flag_ongoing = 0
 
     def update_indicator(self):
         """
@@ -134,11 +159,12 @@ class stream:
         :return:
         """
         modelID = self.pd_indicator_record[self.pd_indicator_record['ModelName']==self.name].ModelID.unique().tolist()[0]
-        try:
+
+        if self.flag_ongoing!=0:
             url = "https://us-central1-modelcreator-cdd8f.cloudfunctions.net/functions/upload_api"
             my_file = open(self.path_currentfile, 'r')
             file_data = my_file.read().strip()
-            date_create = str(file_data).split(' ')[0].split(',')[0]
+            date_create = file_data.split('\n')[-1].split(' ')[0].split(',')[0] # Use the last date
             payload = {
                 "model_id": modelID,
                 "file_data": file_data,
@@ -158,5 +184,5 @@ class stream:
             else:
                 self.logging.error('Update failed, we did not update %s to the server' % self.path_currentfile)
                 self.logging.error('Reason: %s', response.text)
-        except:
-            self.logging.error('Failed to upload updated file %s' % (self.path_currentfile))
+        else:
+            self.logging.error('Update not executed, we did not update %s to the server' % self.path_currentfile)

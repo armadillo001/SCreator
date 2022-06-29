@@ -21,7 +21,7 @@ credential = config_cred['Creator_session']['session_cookie']
 
 # Read configuration file
 config = configparser.ConfigParser()
-config.read('config.ini')
+config.read('config_online.ini')
 
 for indicator in config.sections():
     logging.info("Working on the indicator %s ......" %(indicator))
@@ -30,15 +30,11 @@ for indicator in config.sections():
     Stream.load_config(config[indicator])
     Stream.process()
 
-    if 1:
-        if Stream.flag_loader_ready:
-            Stream.fun_save_hist()
-            Stream.create_indicator()
-            time.sleep(3)
-            Stream.fun_save_ongoing()
-            Stream.update_indicator()
-            time.sleep(2)
-        break
-    else:
-        print('has not been uplaoded anything!')
-        break
+    if Stream.flag_loader_ready:
+        Stream.fun_save_hist()
+        Stream.create_indicator()
+        time.sleep(3)
+
+        Stream.fun_save_ongoing()
+        Stream.update_indicator()
+        time.sleep(3)
