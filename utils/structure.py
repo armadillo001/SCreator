@@ -3,9 +3,11 @@ import requests
 import json
 import numpy as np
 import pandas as pd
+import os
 import time
 
 class stream:
+
 
     def __init__(self, logging, credential, now_time, path_indicator_state):
         self.logging = logging
@@ -17,6 +19,8 @@ class stream:
         self.description = ""
         self.dateStart = ""
         self.target = ""
+        self.model_type = "indicator"
+
         self.authors = []
         self.pctgs = []
 
@@ -37,6 +41,8 @@ class stream:
             self.name = config.name
             self.description = config['description']
             self.dateStart = config['dateStart']
+            if 'model_type' in config:
+                self.model_type = config['model_type'] # 'stoploss'
             self.target = config['target']
             self.authors = config['authors']
             self.pctgs = config['pctgs']
@@ -67,12 +73,13 @@ class stream:
             self.logging.error('Failed to process %s, please check whether the loader is ready' % (path_loader))
             self.flag_loader_ready = 0
 
+
     def fun_save_hist(self):
         """
         Load and save the historic data file
         :return:
         """
-        self.path_histfile = 'data/init_with/' + self.name + '.csv'
+        self.path_histfile = os.path.join('data', "init_with", self.name + '.csv')
         self.flag_init = not np.sum(self.pd_indicator_record.ModelName.str.fullmatch(self.name).values)>=1
         if self.flag_init==True:
             try:
@@ -100,6 +107,7 @@ class stream:
                     "pctgs[]": self.pctgs.split(','),
                     "model_name": self.name,
                     "model_description": self.description,
+                    "model_type": self.model_type ,
                     "history_file": history_file_str,
                     "stocks": self.target,
                     "range": self.range  # put in (0 - 4) for (na, up to tmr, up to 1 week, up to 2 weeks, up to a month)
@@ -131,7 +139,7 @@ class stream:
         :return:
         """
 
-        self.path_currentfile = 'data/on_going/' + self.name + '.csv'
+        self.path_currentfile = os.path.join('data', 'on_going', self.name + '.csv')
         self.pd_indicator_record_result = pd.read_csv(self.path_indicator_state, index_col=0)
         time_model_last_updated = self.pd_indicator_record[self.pd_indicator_record['ModelName']==self.name].LastUpdateLocalTime.iloc[-1]
         self.arr_computed.index = self.arr_computed.index.strftime("%Y-%m-%d")
@@ -152,6 +160,7 @@ class stream:
         except:
             self.logging.error('Failed to save update file %s' % (self.path_currentfile))
             self.flag_ongoing = 0
+
 
     def update_indicator(self):
         """
@@ -186,3 +195,4 @@ class stream:
                 self.logging.error('Reason: %s', response.text)
         else:
             self.logging.error('Update not executed, we did not update %s to the server' % self.path_currentfile)
+
