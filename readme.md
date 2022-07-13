@@ -23,9 +23,10 @@ the session cookie can be found on your profile page (click the top right corner
 #### 1. Setup /config.ini ####
 Please find "config.ini" file in the root directory, save all the information (meta data) of data-streams, 
 when you add a new data-stream, please set up the config.ini file so that the system will create and upload it to the 
-platform automatically. You can refer to the example. After you setup the indicator, please make sure you have the right 
-loader file defined in 'loader/' directory. For each indicator, you need to have a seperate file with the same indicator 
-name defined in "loader/" directory.
+platform automatically. You can refer to the example in the root folder. 
+
+![Image3](https://user-images.githubusercontent.com/16822689/178782407-546fdfa6-6890-4710-ac4b-d44f6ae81d52.png)
+
 
 * description: a short description about the indicator
 * authors: ID of the contributors, can be obtained from the user profile page (click the top right of user profile),
@@ -37,12 +38,29 @@ multiple authors are seperated by comma ","
 3: up to two weeks, 4: up to a month).
 
 #### 2. Define a loading method ####
-loader/YOURMETHOD.py: it includes important functions regarding how to download and process the files. The name of the
-file should be STRICT the name of the indicator you defined in the config.ini file. Otherwise the system cannot find it.
-Please refer to the examples we saved in this directory.
+After you setup the indicator, please make sure you have the right 
+loader file defined in 'loader/' directory. For each indicator, you need to have a seperate file with the same indicator name defined in "loader/" directory.
+
+![image2](https://user-images.githubusercontent.com/16822689/178781592-42400649-9c62-4958-8de9-ebe49b63dcad.png)
+
+
+* loader/YOURMETHOD.py: it includes important functions regarding how to download and process the files. (The name of the
+file should be STRICT the name of the indicator you defined in the config.ini file. Otherwise the system cannot find it. Please refer to the examples we saved in this directory.)
+
+![image4](https://user-images.githubusercontent.com/16822689/178783423-45f35d57-a150-4390-9900-fdef374ef86e.png)
+
+
+* fun_load_data.py: function loader, you can use it to download a pandas dataframe based on external API.
+* fun_compute_data.py: compute a one dimensional time series the data. Note that the date format should be saved as ("YYYY-MM-DD").
+
 
 #### 3. Run the main function daily ####
 We assume the creator of the data function will maintain the data stream in S-creator everyday so that others can use it. 
 So a good idea would be to schedule the main.py task using something like "crontab" (in Linux and Mac) in your local system.  
+
+* Note that if there is an indicator has not been updated, it will cause the whole projection system (S-ensembler) pause at the latest date that the indicator updated. So in order to make the system work, all the indicators created by you need to up-to-date.
+* If you're using linux/Mac opeartion system, "crontab -e" will help you schedule tasks and update the indicator on time. 
+* For windows sytem, "task scheduler" can do the same.
+
 
 
