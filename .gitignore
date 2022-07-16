@@ -5,3 +5,7 @@
 *.pyc
 *.zip
 confidential/
+
+utils_houly/*
+config_hour.ini
+main_unlimited.py
